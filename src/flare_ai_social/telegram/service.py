@@ -1,6 +1,8 @@
 import time
 from typing import Any, cast
 
+from flare_ai_social.flare.getFLRPrice import FTSOService
+from flare_ai_social.flare.getXRPPrice import FDCService
 import structlog
 from telegram import Bot, Chat, Message, MessageEntity, Update, User
 from telegram.error import TelegramError
@@ -114,7 +116,7 @@ class TelegramBot:
                             "offset": e.offset,
                             "length": e.length,
                             "text": (
-                                message.text[e.offset : e.offset + e.length]
+                                message.text[e.offset: e.offset + e.length]
                                 if message.text
                                 else None
                             ),
@@ -205,6 +207,48 @@ class TelegramBot:
             f"- Message received successfully!"
         )
 
+    async def pulse_command(
+        self, update: Update, _context: ContextTypes.DEFAULT_TYPE
+    ) -> None:
+        logger.info("pulse_command ")
+
+        """Handle the /pulse command."""
+        if not update.effective_user or not update.message or not update.effective_chat:
+            return
+
+        logger.info("pulse_command 2")
+
+        user: User = update.effective_user
+        user_id: int = user.id
+
+        if not self._is_user_allowed(user_id):
+            await update.message.reply_text(
+                "Sorry, you're not authorized to use this bot."
+            )
+            logger.warning("Unauthorized access attempt", user_id=user_id)
+            return
+
+        logger.info("telegram service 1")
+        # Call FDC and FTSO
+        fdc_service = FDCService()
+        logger.info("telegram service 2")
+
+        xrp_price = fdc_service.get_xrp_price_fdc()
+        logger.info("telegram service 3")
+        logger.info(xrp_price)
+
+        ftso_service = FTSOService()
+        logger.info("telegram service 4")
+
+        flr_price, timestamp = ftso_service.get_flr_price()
+        logger.info("telegram service 5")
+
+        await update.message.reply_text(
+            f"👋 Hello {user.first_name}! Here is the latest Flare Pulse :fire:"
+            f"XRP Price: {xrp_price}. flr_price:{flr_price} timestamp: {timestamp}"
+        )
+        logger.info("Pulse command handled", user_id=user_id)
+
     async def start_command(
         self, update: Update, _context: ContextTypes.DEFAULT_TYPE
     ) -> None:
@@ -265,7 +309,7 @@ class TelegramBot:
         # Check direct mentions using entities
         for entity in entities:
             if entity.type == "mention":
-                mention_text = text[entity.offset : entity.offset + entity.length]
+                mention_text = text[entity.offset: entity.offset + entity.length]
                 bot_username = self.me.username.lower()
                 mention_without_at = (
                     mention_text[1:].lower()
@@ -281,7 +325,7 @@ class TelegramBot:
                 idx = text.lower().find(variation.lower())
                 if idx >= 0:
                     actual_length = len(variation)
-                    actual_mention = text[idx : idx + actual_length]
+                    actual_mention = text[idx: idx + actual_length]
                     return True, text.replace(actual_mention, "").strip()
 
         # Check if message is a reply to bot
@@ -447,13 +491,18 @@ class TelegramBot:
             self.me = None
 
         # Add handlers in the correct order
-        self.application.add_handler(CommandHandler("start", self.start_command))
+        self.application.add_handler(
+            CommandHandler("start", self.start_command))
+        self.application.add_handler(
+            CommandHandler("pulse", self.pulse_command))
         self.application.add_handler(CommandHandler("help", self.help_command))
-        self.application.add_handler(CommandHandler("debug", self.debug_command))
+        self.application.add_handler(
+            CommandHandler("debug", self.debug_command))
 
         # Add message handler for text messages
         self.application.add_handler(
-            MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message)
+            MessageHandler(filters.TEXT & ~filters.COMMAND,
+                           self.handle_message)
         )
 
         # Add error handler

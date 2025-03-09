@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     )
     telegram_polling_interval: int = 5  # Seconds between checking for updates
 
+    financialmodeling_api_key: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
@@ -92,6 +94,7 @@ settings = Settings()
 logger.debug(
     "settings",
     settings=settings.model_dump(
-        exclude={"x_api_key_secret", "x_access_token_secret", "telegram_api_token"}
+        exclude={"x_api_key_secret",
+                 "x_access_token_secret", "telegram_api_token"}
     ),
 )
